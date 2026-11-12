@@ -1,72 +1,31 @@
-# pdd-pro.kz — готовый сайт ПДД PRO
+# pdd-pro.kz — сайт ПДД PRO (готовая сборка)
 
-Здесь лежит **собранный** сайт pdd-pro.kz. Руками ничего не править: всё перезаписывается при каждой сборке.
-Исходники (база правил и вопросов, генератор) — в закрытом репозитории Олега: `pdd/kz/`, `tools/pdd_site.py`, `tools/pdd_publish.py`.
+**Что за сайт.** ПДД PRO — Правила дорожного движения Казахстана простыми словами на трёх языках (ru, kk, en): официальный текст
+каждого пункта, объяснение, частые ошибки, вопросы для самопроверки. Владелец — Олег Дмитриев (avtoelektrik-pro.kz).
 
-- `site/` — сайт целиком: статические HTML-страницы, PHP и база не нужны.
-- Адреса: `/ru/`, `/kk/`, `/en/`, `/<яз>/pdd/punkt-103/` (папка с `index.html`), `sitemap.xml`, `robots.txt`.
-- Пока идёт предпросмотр, во всех страницах `noindex`, а в `robots.txt` — `Disallow: /`.
+**Стек.** Статический HTML. PHP, Node и база данных не нужны. Внешних скриптов, шрифтов, CDN и счётчиков нет; небольшой CSS и JS
+(перемешать ответы, показать разбор) — внутри страниц.
 
-## Сервер: забирает сайт сам (ключей нет)
+**Сборка.** На сервере не нужна. Сайт собирается в закрытом репозитории Олега (`tools/pdd_site.py` из базы `pdd/kz/`,
+выкладка сюда — `tools/pdd_publish.py`) и коммитится готовым в `site/`. Здесь руками ничего не править — перезаписывается.
 
-Раз в 5 минут сервер скачивает этот репозиторий по HTTPS и, если что-то изменилось, выкладывает `site/` в папку сайта.
-Пароли и ключи не нужны: репозиторий открытый, только чтение.
+**Что отдаёт веб-сервер — папку `site/` как корень сайта:**
+- `site/index.html` — выбор языка (noindex); основные страницы — `/ru/`, `/kk/`, `/en/`;
+- адреса — папки с `index.html`: `/ru/pdd/`, `/ru/pdd/glava-13/`, `/ru/pdd/punkt-103/`, `/ru/pdd/punkt-95-1/`;
+- `site/404.html` — «страница не найдена» на всех языках, ссылки от корня;
+- `site/sitemap.xml` (с hreflang), `site/robots.txt`;
+- значки `favicon.ico`, `favicon.svg`, `apple-touch-icon.png` (180×180); картинки для ссылок в мессенджерах и соцсетях
+  `og-ru.png`, `og-kk.png`, `og-en.png` (1200×630). Их имена не меняются; HTML меняется с каждой версией.
 
-`/usr/local/bin/pdd-pull.sh`:
+**База, запись файлов, настройки и переменные окружения, cron, почта, формы, внешние сервисы** — нет.
 
-```sh
-#!/bin/sh
-# pdd-pro.kz: забрать готовый сайт из github.com/oleg1211110-ops/pdd-pro-www и выложить, если изменился
-set -eu
-REPO=https://github.com/oleg1211110-ops/pdd-pro-www.git
-SRC=/srv/pdd-pro.kz-src        # клон репозитория
-DST=/var/www/pdd-pro.kz         # root в nginx
-if [ -d "$SRC/.git" ]; then OLD=$(git -C "$SRC" rev-parse HEAD); else git clone -q --depth 1 "$REPO" "$SRC"; OLD=none; fi
-git -C "$SRC" fetch -q --depth 1 origin main
-git -C "$SRC" reset -q --hard FETCH_HEAD
-NEW=$(git -C "$SRC" rev-parse HEAD)
-[ "$OLD" = "$NEW" ] && [ -f "$DST/index.html" ] && exit 0
-[ -f "$SRC/site/index.html" ] || { echo "pdd-pro.kz: в репозитории нет site/index.html — не выкладываю" >&2; exit 1; }
-mkdir -p "$DST"
-rsync -a --delete "$SRC/site/" "$DST/"
-echo "pdd-pro.kz: выложено $NEW"
-```
+**Ветки.** `main` — всегда готовая версия, другой работы здесь нет. Файл `SOURCE` — из какого коммита исходников собрано.
 
-`/etc/systemd/system/pdd-pull.service` и `/etc/systemd/system/pdd-pull.timer`:
+**Предпросмотр (сейчас).** Все страницы `noindex,follow`, в `robots.txt` — `Disallow: /`. Запуск — по слову Сергея: сборка без
+предпросмотра, noindex уходит, `robots.txt` — `Allow: /` и `Sitemap: https://pdd-pro.kz/sitemap.xml`.
 
-```ini
-[Unit]
-Description=pdd-pro.kz: забрать готовый сайт
+**Корень `/` и x-default.** `/` — выбор языка с noindex; `x-default` во всех hreflang указывает на `/ru/`: русский — основной язык
+для большинства, путь до содержимого короче. Если понадобится, `/` можно сделать индексируемой и перевести x-default на неё.
 
-[Service]
-Type=oneshot
-# или пользователь сайта, которому принадлежат SRC и DST
-User=www-data
-ExecStart=/usr/local/bin/pdd-pull.sh
-```
-
-```ini
-[Unit]
-Description=pdd-pro.kz: проверять обновления каждые 5 минут
-
-[Timer]
-OnBootSec=2min
-OnUnitActiveSec=5min
-
-[Install]
-WantedBy=timers.target
-```
-
-```sh
-apt install -y git rsync      # если ещё не стоят
-chmod +x /usr/local/bin/pdd-pull.sh
-mkdir -p /srv/pdd-pro.kz-src /var/www/pdd-pro.kz && chown www-data: /srv/pdd-pro.kz-src /var/www/pdd-pro.kz
-systemctl daemon-reload && systemctl enable --now pdd-pull.timer
-systemctl start pdd-pull.service && journalctl -u pdd-pull.service -n 5   # первая выкладка сразу
-```
-
-## nginx
-
-Обычный статический сайт: `root /var/www/pdd-pro.kz; index index.html; location / { try_files $uri $uri/ =404; }`,
-`www.pdd-pro.kz` → 301 на `pdd-pro.kz`, HTTPS (Let's Encrypt). Кэш: HTML — короткий (минуты), остальное — дольше.
-Главная `/` — выбор языка (noindex), основные страницы — `/ru/`, `/kk/`, `/en/`.
+**При обновлении** нужно только заменить файлы из `site/`. Если когда-нибудь понадобится что-то ещё (перенаправления, новые
+настройки сервера), это будет в сообщении к версии.
