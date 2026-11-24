@@ -1,6 +1,7 @@
 # Приложение ПДД PRO для Android — сборка без подписи (24.11.2026).
 # Готовит tools/pdd_app.py в закрытом репозитории avtoelektrik-src; подпись — там же (tools/pdd_app_sign.py), ключей здесь нет.
-# Результат — ветка app-build (один коммит: pdd-pro-unsigned.aab и .apk) и артефакт запуска.
+# Результат — ветка app-build (один коммит: pdd-pro-unsigned.aab для Google Play и pdd-pro-test.apk — пробный, подписан
+# отладочным ключом, ставится на телефон для проверки) и артефакт запуска.
 name: Приложение Android
 on:
   workflow_dispatch:
@@ -37,13 +38,13 @@ jobs:
           sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]*\"/versionName \"$V.${{ github.run_number }}\"/" android/app/build.gradle
           grep -E 'versionCode|versionName|applicationId' android/app/build.gradle
           npx cap sync android
-      - name: Сборка AAB и APK (без подписи)
+      - name: Сборка AAB (без подписи) и пробного APK
         working-directory: app/android
         run: |
-          ./gradlew --no-daemon bundleRelease assembleRelease
+          ./gradlew --no-daemon bundleRelease assembleDebug
           mkdir -p ../../out
           cp app/build/outputs/bundle/release/app-release.aab ../../out/pdd-pro-unsigned.aab
-          cp "$(ls app/build/outputs/apk/release/*.apk | head -1)" ../../out/pdd-pro-unsigned.apk
+          cp "$(ls app/build/outputs/apk/debug/*.apk | head -1)" ../../out/pdd-pro-test.apk
           echo "$(cat ../version.txt).${{ github.run_number }}" > ../../out/VERSION
           ls -la ../../out
       - uses: actions/upload-artifact@v4
