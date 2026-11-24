@@ -1,0 +1,18 @@
+{
+  "appId": "kz.pddpro.app",
+  "appName": "ПДД PRO",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DARK"
+    }
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
